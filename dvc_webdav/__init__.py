@@ -23,14 +23,9 @@ def ask_password(host, user):
 
 @wrap_with(threading.Lock())
 @memoize
-def get_bearer_auth_client(bearer_token_command: str, token: Optional[str] = None, save_token_cb=None):
-    logger.debug(
-        "Bearer token command provided, using BearerAuthClient, command: %s",
-        bearer_token_command,
-    )
-    return BearerAuthClient(
-        bearer_token_command, token=token, save_token_cb=save_token_cb
-    )
+def get_bearer_auth_client(bearer_token_command: str):
+    logger.debug("Bearer token command provided, using BearerAuthClient, command: %s", bearer_token_command, )
+    return BearerAuthClient(bearer_token_command)
 
 
 class WebDAVFileSystem(FileSystem):  # pylint:disable=abstract-method
@@ -54,9 +49,11 @@ class WebDAVFileSystem(FileSystem):  # pylint:disable=abstract-method
             }
         )
         if bearer_token_command := config.get("bearer_token_command"):
-            self.fs_args["http_client"] = get_bearer_auth_client(
-                bearer_token_command, token=config.get('token'), save_token_cb=self._save_token
-            )
+            client = get_bearer_auth_client(bearer_token_command)
+            client.save_token_cb = self._save_token
+            if token := config.get("token"):
+                client.update_token(token)
+            self.fs_args["http_client"] = client
 
     def unstrip_protocol(self, path: str) -> str:
         return self.fs_args["base_url"] + "/" + path

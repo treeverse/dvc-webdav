@@ -92,7 +92,6 @@ class BearerAuthClient(httpx.Client):
             self,
             bearer_token_command: str,
             save_token_cb: Optional[TokenSaver] = None,
-            token: Optional[str] = None,
             **kwargs,
     ):
         super().__init__(**kwargs)
@@ -100,17 +99,8 @@ class BearerAuthClient(httpx.Client):
             raise ValueError("[BearerAuthClient] bearer_token_command must be a non-empty string")
         self.bearer_token_command = bearer_token_command
         self.save_token_cb = save_token_cb
-        self._token: Optional[str] = token
+        self._token: Optional[str] = None
         self._lock = threading.Lock()
-
-        if not self._token:
-            auth_header = self.headers.get("Authorization")
-            if auth_header and auth_header.startswith("Bearer "):
-                self._token = auth_header.split(" ", 1)[1]
-
-        if self._token:
-            logger.debug("[BearerAuthClient] Initial token found, setting Authorization header.")
-            self.headers["Authorization"] = f"Bearer {self._token}"
 
     def _refresh_token_locked(self) -> None:
         """Execute token command and update state."""
@@ -141,6 +131,16 @@ class BearerAuthClient(httpx.Client):
         with self._lock:
             if not self._token:
                 self._refresh_token_locked()
+
+    def update_token(self, token: Optional[str]) -> None:
+        """Update the token with a new one"""
+        if not token:
+            return
+
+        with self._lock:
+            if self._token != token:
+                self._token = token
+                self.headers["Authorization"] = f"Bearer {token}"
 
     def request(self, *args, **kwargs) -> httpx.Response:
         """Wraps httpx.request with auto-refresh logic for 401 Unauthorized."""
