@@ -46,6 +46,7 @@ tests = [
     "pytest-xdist>=3.2",
     "wsgidav>=3,<5",
     "cheroot>=8.6,<12",
+    "pytest-mock>=3.15.1,<4",
 ]
 
 [project.urls]

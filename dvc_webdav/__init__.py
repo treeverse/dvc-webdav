@@ -7,14 +7,27 @@ from funcy import memoize, wrap_prop, wrap_with
 
 from dvc.utils.objects import cached_property
 from dvc_objects.fs.base import FileSystem
+from dvc_webdav.bearer_auth import BearerAuth
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("dvc")
 
 
 @wrap_with(threading.Lock())
 @memoize
 def ask_password(host, user):
     return getpass(f"Enter a password for host '{host}' user '{user}':\n")
+
+
+@wrap_with(threading.Lock())
+@memoize
+def get_bearer_auth(bearer_token_command: str, shell_timeout: int) -> BearerAuth:
+    logger.debug(
+        "Bearer token command provided, using BearerAuth, "
+        "command: %s, shell_timeout: %s",
+        bearer_token_command,
+        shell_timeout,
+    )
+    return BearerAuth(bearer_token_command, shell_timeout)
 
 
 class WebDAVFileSystem(FileSystem):  # pylint:disable=abstract-method
@@ -37,6 +50,9 @@ class WebDAVFileSystem(FileSystem):  # pylint:disable=abstract-method
                 "timeout": config.get("timeout", 30),
             }
         )
+        if bearer_token_command := config.get("bearer_token_command"):
+            auth = get_bearer_auth(bearer_token_command, self.fs_args["timeout"])
+            self.fs_args["auth"] = auth
 
     def unstrip_protocol(self, path: str) -> str:
         return self.fs_args["base_url"] + "/" + path
